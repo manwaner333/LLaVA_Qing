@@ -13,7 +13,11 @@ from llava.mm_utils import tokenizer_image_token, get_model_name_from_path, Keyw
 
 from PIL import Image
 import math
+import random
+import numpy as np
 
+# np.random.seed(42)
+# torch.manual_seed(42)
 
 def split_list(lst, n):
     """Split a list into n (roughly) equal-sized chunks"""
@@ -24,7 +28,6 @@ def split_list(lst, n):
 def get_chunk(lst, n, k):
     chunks = split_list(lst, n)
     return chunks[k]
-
 
 def eval_model(args):
     # Model
@@ -41,6 +44,7 @@ def eval_model(args):
     for line in tqdm(questions):
         idx = line["question_id"]
         image_file = line["image"]
+        label = line["label"]
         qs = line["text"]
         cur_prompt = qs
         if model.config.mm_use_im_start_end:
@@ -62,8 +66,17 @@ def eval_model(args):
         keywords = [stop_str]
         stopping_criteria = KeywordsStoppingCriteria(keywords, tokenizer, input_ids)
 
+        # with torch.inference_mode():
+        #     outputs = model.generate(
+        #         input_ids,
+        #         images=image_tensor.unsqueeze(0).half().cuda(),
+        #         max_new_tokens=1,
+        #         output_hidden_states=True,
+        #         return_dict_in_generate=True,
+        #         use_cache=True)
+
         with torch.inference_mode():
-            output_ids = model.generate(
+            model_outputs = model.generate(
                 input_ids,
                 images=image_tensor.unsqueeze(0).half().cuda(),
                 do_sample=True if args.temperature > 0 else False,
@@ -71,9 +84,11 @@ def eval_model(args):
                 top_p=args.top_p,
                 num_beams=args.num_beams,
                 # no_repeat_ngram_size=3,
-                max_new_tokens=1024,
+                max_new_tokens=1,
+                output_hidden_states=True,
+                return_dict_in_generate=True,
                 use_cache=True)
-
+        output_ids = model_outputs['sequences']
         input_token_len = input_ids.shape[1]
         n_diff_input_output = (input_ids != output_ids[:, :input_token_len]).sum().item()
         if n_diff_input_output > 0:
@@ -83,14 +98,34 @@ def eval_model(args):
         if outputs.endswith(stop_str):
             outputs = outputs[:-len(stop_str)]
         outputs = outputs.strip()
+        layers_to_process = [-1, -4, -6, -8]
+        # for layer in layers_to_process:
+        # hidden_states = model_outputs['hidden_states'][0]
+        # 此处只考虑了batch_size 为1的情况
+        # layer_0 = hidden_states[layers_to_process[0]][0, -1, :].detach().cpu().numpy().tolist()
+        # layer_1 = hidden_states[layers_to_process[1]][0, -1, :].detach().cpu().numpy().tolist()
+        # layer_2 = hidden_states[layers_to_process[2]][0, -1, :].detach().cpu().numpy().tolist()
+        # layer_3 = hidden_states[layers_to_process[3]][0, -1, :].detach().cpu().numpy().tolist()
 
         ans_id = shortuuid.uuid()
         ans_file.write(json.dumps({"question_id": idx,
                                    "prompt": cur_prompt,
                                    "text": outputs,
+                                   "label": label,
                                    "answer_id": ans_id,
                                    "model_id": model_name,
+                                   # "layer_0": layer_0,
+                                   # "layer_1": layer_1,
+                                   # "layer_2": layer_2,
+                                   # "layer_3": layer_3,
                                    "metadata": {}}) + "\n")
+
+        # ans_file.write(json.dumps({"question_id": idx,
+        #                            "prompt": cur_prompt,
+        #                            "text": outputs,
+        #                            "answer_id": ans_id,
+        #                            "model_id": model_name,
+        #                            "metadata": {}}) + "\n")
         ans_file.flush()
     ans_file.close()
 

@@ -3,8 +3,8 @@ import json
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--src", type=str)
-parser.add_argument("--dst", type=str)
+parser.add_argument("--src", type=str, default='result/gqa/llava_gqa_testdev_balanced_predictions.json')
+parser.add_argument("--dst", type=str, default='result/gqa/testdev_balanced_predictions.json')
 args = parser.parse_args()
 
 all_answers = []
