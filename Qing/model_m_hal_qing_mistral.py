@@ -51,7 +51,7 @@ def eval_model(args):
         # if count == 100:
         #     break
         image_file = line["image"]
-        labels = line["labels"]
+        labels = line["new_labels"]
         sentences = line['sentences']
         qs = line["question"]
         res = line["response"]
@@ -79,13 +79,17 @@ def eval_model(args):
             model_outputs = model(
                 input_ids,
                 images=image_tensor.unsqueeze(0).half().cuda(),
-                output_hidden_states=True)
+                output_hidden_states=True,
+                output_attentions=True)
 
         # hidden states
         hidden_states = model_outputs['hidden_states'][32][0]
 
         # logit
         logits = model_outputs['logits']
+
+        # attention
+        attentions = model_outputs['attentions']
 
         # ques_start_idx  and res_end_idx 在此处是相对于 input_ids的
         images_idx = torch.where(input_ids == IMAGE_TOKEN_INDEX)[1].detach().cpu().numpy().tolist()[0]
@@ -121,7 +125,7 @@ def eval_model(args):
         for t in range(shifted_input_ids.shape[1]):
             gen_tok_id = shifted_input_ids[:, t]
             gen_tok = tokenizer.decode(gen_tok_id)
-            lp = gathered_log_probs[:, t]
+            lp = gathered_log_probs[:, t][0]
             entro = entropies[t]
 
             tokens.append(gen_tok)
@@ -130,6 +134,7 @@ def eval_model(args):
             token_and_logprobs.append([gen_tok, lp, entro])
             tokens_idx.append(gen_tok_id.detach().cpu().numpy().tolist())
 
+        combined_attentions = {}
         combined_hidden_states = {}
         combined_token_logprobs = {}
         combined_token_entropies = {}
@@ -140,6 +145,8 @@ def eval_model(args):
         ques_end_for_total_idx = ques_start_for_total_idx + ques_tokens_len - 1
         ques_hidden_states = hidden_states[ques_end_for_total_idx:ques_end_for_total_idx + 1, :]
         combined_hidden_states["ques"] = ques_hidden_states.detach().cpu().numpy().tolist()
+        combined_attentions['ques'] = attentions[31][0, :, ques_start_for_total_idx:ques_end_for_total_idx + 1,
+                                      ques_start_for_total_idx:ques_end_for_total_idx + 1].detach().cpu().numpy().tolist()
 
         sentences_end = []
         sentences_end.append(ques_end_for_total_idx)
@@ -164,9 +171,11 @@ def eval_model(args):
             sentence_len = i2 - i1 + 1
             sentence_end = start_idx + sentence_len - 1
             hidden_state = hidden_states[sentence_end:sentence_end + 1, :]
+            attention = attentions[31][0, :, start_idx:sentence_end + 1, start_idx:sentence_end + 1].detach().cpu().numpy().tolist()
             combined_hidden_states[sent_i] = hidden_state.detach().cpu().numpy().tolist()
             combined_token_logprobs[sent_i] = token_logprobs[i1:i2+1]
             combined_token_entropies[sent_i] = token_entropies[i1:i2+1]
+            combined_attentions[sent_i] = attention
             sentences_end.append(sentence_end)
             record.append([start_idx, sentence_end])
             record1.append([i1, i2])
@@ -181,6 +190,7 @@ def eval_model(args):
             "combined_hidden_states": combined_hidden_states,
             "combined_token_logprobs": combined_token_logprobs,
             "combined_token_entropies": combined_token_entropies,
+            "combined_attentions": combined_attentions,
             "token_and_logprobs": token_and_logprobs
         }
 

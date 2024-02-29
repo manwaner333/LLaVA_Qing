@@ -12,6 +12,8 @@ result/*
 *.jpg
 # Data
 data/*
+Qing/tfidf_model.joblib
+Qing/temporary/mhaldetect_llava15_7b_train_tokens.txt
 !**/alpaca-data-conversation.json
 *.zip
 *.npy

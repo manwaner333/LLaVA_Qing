@@ -12,13 +12,11 @@ import csv
 import joblib
 from sklearn.metrics import roc_auc_score
 
-
 def unroll_pred(scores, indices):
     unrolled = []
     for idx in indices:
         unrolled.extend(scores[idx])
     return unrolled
-
 
 # def get_PR_with_human_labels(preds, human_labels, pos_label=1, oneminus_pred=False):
 #     indices = [k for k in human_labels.keys()]
@@ -35,7 +33,7 @@ def unroll_pred(scores, indices):
 def get_PR_with_human_labels(preds, human_labels, pos_label=1, oneminus_pred=False):
     unroll_preds = preds
     if oneminus_pred:
-        unroll_preds = [1.0 - x for x in unroll_preds]
+        unroll_preds = [1.0-x for x in unroll_preds]
     unroll_labels = human_labels
     assert len(unroll_preds) == len(unroll_labels)
     print("len:", len(unroll_preds))
@@ -43,9 +41,8 @@ def get_PR_with_human_labels(preds, human_labels, pos_label=1, oneminus_pred=Fal
     # auroc = roc_auc_score(unroll_labels, unroll_preds)
     return P, R
 
-
 def print_AUC(P, R):
-    print("AUC: {:.2f}".format(auc(R, P) * 100))
+    print("AUC: {:.2f}".format(auc(R, P)*100))
 
 
 def detect_hidden_states(combined_hidden_states):
@@ -53,7 +50,6 @@ def detect_hidden_states(combined_hidden_states):
         if len(v) == 0:
             return False
     return True
-
 
 def tfidf_encode(vectorizer, sent):
     tfidf_matrix = vectorizer.transform([sent])
@@ -85,6 +81,7 @@ def tfidf_encode(vectorizer, sent):
 
 
 def extract_info_from_answers(file_path, use_tfidf_weight=False, use_attention_weight=False):
+
     with open(file_path, "rb") as f:
         responses = pickle.load(f)
 
@@ -108,6 +105,8 @@ def extract_info_from_answers(file_path, use_tfidf_weight=False, use_attention_w
     attention_weight_scores = {}
     new_vectorizer = joblib.load('Qing/tfidf_model.joblib')
 
+
+
     for idx, response in responses.items():
 
         question_id = response["question_id"]
@@ -118,6 +117,7 @@ def extract_info_from_answers(file_path, use_tfidf_weight=False, use_attention_w
         sentences_len = len(response["sentences"])
         tokens = response['logprobs']['tokens']
         attentions = response['logprobs']['combined_attentions']
+
 
         average_logprob_sent_level = [None for _ in range(sentences_len)]  # [None for _ in range(sentences_len)]
         lowest_logprob_sent_level = [None for _ in range(sentences_len)]
@@ -160,12 +160,14 @@ def extract_info_from_answers(file_path, use_tfidf_weight=False, use_attention_w
                 sentence_log_probs = sentence_log_probs_weight
                 sentence_entropies = sentence_entropies_weight
 
+
             attention_weights = attentions[i][-1][-1]
             sentence_log_probs_weight = [a * b for a, b in zip(sentence_log_probs, attention_weights)]
             sentence_entropies_weight = [a * b for a, b in zip(sentence_entropies, attention_weights)]
             if use_attention_weight:
                 sentence_log_probs = sentence_log_probs_weight
                 sentence_entropies = sentence_entropies_weight
+
 
             # if label in ['ACCURATE', 'INACCURATE']:
             average_logprob = np.mean(sentence_log_probs)
@@ -231,13 +233,11 @@ def extract_info_from_answers(file_path, use_tfidf_weight=False, use_attention_w
             , label_True_response, label_False_response, tfidf_weight_scores, attention_weight_scores)
 
 
-def form_dataframe_from_extract_info(average_logprob_scores, lowest_logprob_scores, average_entropy_scores,
-                                     highest_entropy_scores, human_label_detect_True, human_label_detect_False,
-                                     sentences_info, images_info
-                                     , sentences_idx_info, token_and_logprobs_info, labels_info, idx_info,
-                                     logprob_response_scores, entropy_response_scores, label_True_response,
-                                     label_False_response
+
+def form_dataframe_from_extract_info(average_logprob_scores, lowest_logprob_scores, average_entropy_scores, highest_entropy_scores, human_label_detect_True, human_label_detect_False, sentences_info, images_info
+                                     , sentences_idx_info, token_and_logprobs_info, labels_info, idx_info, logprob_response_scores, entropy_response_scores, label_True_response, label_False_response
                                      , tfidf_weight_scores, attention_weight_scores):
+
     average_logprob_pd = []
     lowest_logprob_pd = []
     average_entropy_pd = []
@@ -257,6 +257,7 @@ def form_dataframe_from_extract_info(average_logprob_scores, lowest_logprob_scor
     tfidf_weight_pd = []
     attention_weight_pd = []
     for dic_idx in range(len(average_logprob_scores)):
+
         average_logprob_pd.extend(average_logprob_scores[dic_idx])
         lowest_logprob_pd.extend(lowest_logprob_scores[dic_idx])
         average_entropy_pd.extend(average_entropy_scores[dic_idx])
@@ -301,10 +302,8 @@ def form_dataframe_from_extract_info(average_logprob_scores, lowest_logprob_scor
     return df_sorted
 
 
-def analysis_sentence_level_info(average_logprob_scores, average_entropy_scores, lowest_logprob_scores,
-                                 highest_entropy_scores
-                                 , human_label_detect_True, average_logprob_flag, average_entropy_flag,
-                                 lowest_logprob_flag, highest_entropy_flag, save_path, name):
+def analysis_sentence_level_info(average_logprob_scores, average_entropy_scores, lowest_logprob_scores, highest_entropy_scores
+                                 , human_label_detect_True, average_logprob_flag, average_entropy_flag, lowest_logprob_flag, highest_entropy_flag, save_path, name):
     # True
     # uncertainty
     Pb_average_logprob, Rb_average_logprob = get_PR_with_human_labels(average_logprob_scores,
@@ -386,28 +385,23 @@ def analysis_response_level_info(logprob_response_scores, entropy_response_score
     plt.show()
 
 
-if __name__ == "__main__":
-    # 计算相关的指标， 并保存数据
-    path = f"result/coco2014_val/answer_coco_pope_adversarial_extract_info.bin"
-    (average_logprob_scores, lowest_logprob_scores, average_entropy_scores, highest_entropy_scores,
-     human_label_detect_True
-     , human_label_detect_False, sentences_info, images_info, sentences_idx_info, token_and_logprobs_info, labels_info,
-     idx_info
-     , logprob_response_scores, entropy_response_scores, label_True_response, label_False_response, tfidf_weight_scores,
-     attention_weight_scores) = extract_info_from_answers(path)
 
-    df = form_dataframe_from_extract_info(average_logprob_scores, lowest_logprob_scores, average_entropy_scores,
-                                          highest_entropy_scores, human_label_detect_True, human_label_detect_False,
-                                          sentences_info, images_info
-                                          , sentences_idx_info, token_and_logprobs_info, labels_info, idx_info,
-                                          logprob_response_scores, entropy_response_scores, label_True_response,
-                                          label_False_response
+if __name__ == "__main__":
+
+    # 计算相关的指标， 并保存数据
+    path = f"result/coco2014_val/llava_v15_7b_answer_coco_pope_adversarial_extract_info.bin"
+    (average_logprob_scores, lowest_logprob_scores, average_entropy_scores, highest_entropy_scores, human_label_detect_True
+     , human_label_detect_False, sentences_info, images_info, sentences_idx_info, token_and_logprobs_info, labels_info, idx_info
+     , logprob_response_scores, entropy_response_scores, label_True_response, label_False_response, tfidf_weight_scores, attention_weight_scores) = extract_info_from_answers(path)
+
+    df = form_dataframe_from_extract_info(average_logprob_scores, lowest_logprob_scores, average_entropy_scores, highest_entropy_scores, human_label_detect_True, human_label_detect_False, sentences_info, images_info
+                                          , sentences_idx_info, token_and_logprobs_info, labels_info, idx_info, logprob_response_scores, entropy_response_scores, label_True_response, label_False_response
                                           , tfidf_weight_scores, attention_weight_scores)
 
-    df.to_csv("result/coco2014_val/coco2014_val_df.csv")
+    df.to_csv("result/coco2014_val/llava_v15_7b_coco2014_adversarial_val_df.csv")
 
     # 读取数据
-    df = pd.read_csv("result/coco2014_val/coco2014_val_df.csv")
+    df = pd.read_csv("result/coco2014_val/llava_v15_7b_coco2014_adversarial_val_df.csv")
 
     average_logprob_scores = df['average_logprob'].tolist()
     lowest_logprob_scores = df['lowest_logprob'].tolist()
@@ -417,10 +411,12 @@ if __name__ == "__main__":
     human_label_detect_False = df['human_label_detect_False'].tolist()
 
     # 分析准确率
+    # true_values = []
+    # for value in human_label_detect_True:
+    #     true_values.extend(value)
     total_num = len(human_label_detect_True)
-    print("The total number of sentences is: {}; The ratio of true values is: {}".format(total_num,
-                                                                                         human_label_detect_True.count(
-                                                                                             1.0) / total_num))
+    print("The total number of sentences is: {}; The ratio of true values is: {}".format(total_num, human_label_detect_True.count(1.0) / total_num))
+
 
     # # 分析sentence level的相关数据
     # False
@@ -430,10 +426,9 @@ if __name__ == "__main__":
     highest_entropy_flag = False  # True
     save_path = 'result/coco2014_val'
     # name = 'pope_llava_15_true'
-    name = 'pope_llava_15_false'
+    name = 'llava_v15_7b_coco2014_adversarial_false'
     analysis_sentence_level_info(average_logprob_scores, average_entropy_scores, lowest_logprob_scores,
-                                 highest_entropy_scores, human_label_detect_False, average_logprob_flag,
-                                 average_entropy_flag, lowest_logprob_flag, highest_entropy_flag, save_path, name)
+                                 highest_entropy_scores, human_label_detect_False, average_logprob_flag, average_entropy_flag, lowest_logprob_flag, highest_entropy_flag, save_path, name)
 
     # True
     average_logprob_flag = False
@@ -441,11 +436,12 @@ if __name__ == "__main__":
     lowest_logprob_flag = False
     highest_entropy_flag = True
     save_path = 'result/coco2014_val'
-    name = 'pope_llava_15_true'
+    name = 'llava_v15_7b_coco2014_adversarial_true'
     analysis_sentence_level_info(average_logprob_scores, average_entropy_scores, lowest_logprob_scores,
                                  highest_entropy_scores, human_label_detect_True, average_logprob_flag,
                                  average_entropy_flag, lowest_logprob_flag, highest_entropy_flag, save_path, name)
 
     # 分析response level的相关数据
     # analysis_response_level_info(logprob_response_scores, entropy_response_scores, label_True_response)
+
 
